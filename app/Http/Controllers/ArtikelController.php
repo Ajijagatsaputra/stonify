@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Artikel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ArtikelController extends Controller
 {
@@ -24,10 +25,16 @@ class ArtikelController extends Controller
         $request->validate([
             'judul' => 'required',
             'konten' => 'required',
+            'status' => 'required',
+            'kategori' => 'required',
+            'tags' => 'required',
+            'deskripsi_singkat' => 'required',
             'gambar' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
-        $data = $request->only(['judul', 'konten']);
+        $slug = Str::slug($request->judul);
+        $data = $request->only(['judul', 'konten', 'status', 'kategori', 'tags', 'deskripsi_singkat']);
+        $data['slug'] = $slug;
 
         if ($request->hasFile('gambar')) {
             $data['gambar'] = $request->file('gambar')->store('uploads/artikel', 'public');
@@ -48,10 +55,16 @@ class ArtikelController extends Controller
         $request->validate([
             'judul' => 'required',
             'konten' => 'required',
+            'status' => 'required',
+            'kategori' => 'required',
+            'tags' => 'required',
+            'deskripsi_singkat' => 'required',
             'gambar' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
-        $data = $request->only(['judul', 'konten']);
+        $slug = Str::slug($request->judul);
+        $data = $request->only(['judul', 'konten', 'status', 'kategori', 'tags', 'deskripsi_singkat']);
+        $data['slug'] = $slug;
 
         if ($request->hasFile('gambar')) {
             if ($artikel->gambar) {
@@ -65,4 +78,12 @@ class ArtikelController extends Controller
 
         return redirect()->route('artikels.index')->with('success', 'Artikel berhasil diperbarui.');
     }
+
+    public function destroy($artikel)
+    {
+        $artikel = Artikel::find($artikel);
+        $artikel->delete();
+        return response()->json(['success' => true]);
+    }
+
 }

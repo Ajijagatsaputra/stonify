@@ -13,5 +13,10 @@ class Artikel extends Model
         'judul',
         'konten',
         'gambar',
+        'tags',
+        'status',
+        'kategori',
+        'deskripsi_singkat',
+        'slug',
     ];
 }

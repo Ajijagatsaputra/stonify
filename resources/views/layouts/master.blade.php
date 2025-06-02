@@ -16,10 +16,19 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <link href="{{ asset('css/home/tiny-slider.css') }}" rel="stylesheet">
     <link href="{{ asset('css/home/style.css') }}" rel="stylesheet">
-    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+
+    @stack('header-styles')
+    @stack('header-script')
+
     <title>@yield('title', 'Stonify')</title>
 </head>
-
+<style>
+a {
+    text-decoration: none;
+}
+</style>
 <body>
 
     <!-- Start Header/Navigation -->
@@ -42,12 +51,38 @@
                             <li><a class="dropdown-item" href="{{ route('frontend.rekomendasi') }}">Desain</a></li>
                         </ul>
                     </li>
+                    <li><a class="nav-link" href="{{ route('frontend.artikel') }}">Artikel</a></li>
                     <li><a class="nav-link" href="{{ route('frontend.contact') }}">Hubungi Kami</a></li>
                 </ul>
 
                 <ul class="custom-navbar-cta navbar-nav mb-2 mb-md-0 ms-5">
                     <li><a class="nav-link" href="{{ route('login') }}"><img src="{{ asset('img/user.svg') }}"></a></li>
-                    <li><a class="nav-link" href="{{ route('frontend.cart') }}"><img src="{{ asset('img/cart.svg') }}"></a></li>
+                    <li class="relative">
+                        <a class="nav-link" href="{{ route('frontend.cart') }}">
+                            <img src="{{ asset('img/cart.svg') }}" class="w-6 h-6">
+                            <span id="cart-count" class="absolute top-0 right-0 inline-flex items-center justify-center w-6 h-6 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
+                                0
+                            </span>
+                        </a>
+                    </li>
+
+                    <script>
+                        function updateCartCount() {
+                            fetch('{{ route('cart.count') }}')
+                                .then(response => response.json())
+                                .then(data => {
+                                    document.getElementById('cart-count').innerText = data.count;
+                                });
+                        }
+
+                        // Auto refresh setiap 10 detik (optional polling)
+                        setInterval(updateCartCount, 10000);
+
+                        // Atau panggil ini saat tambah item ke cart
+                        // updateCartCount();
+                    </script>
+
+
                 </ul>
             </div>
         </div>

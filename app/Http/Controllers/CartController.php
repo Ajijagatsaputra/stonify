@@ -114,4 +114,7 @@ class CartController extends Controller
                     ->where('user_id', auth()->id())
                     ->get();
     }
+
+
+    
 }

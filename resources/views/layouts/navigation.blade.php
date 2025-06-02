@@ -17,7 +17,7 @@
                     </x-nav-link>
 
                     @can('manage pesanan')
-                    <x-nav-link :href="route('pesanan.index')" :active="request()->route('pesanan.index')">
+                    <x-nav-link :href="route('pesanan.index')" :active="request()->routeIs('pesanan.index')">
                         {{ __('Manage Pesanan') }}
                     </x-nav-link>
                     @endcan
@@ -29,17 +29,16 @@
                     @endcan
 
                     @can('manage order')
-
                         <x-nav-link :href="route('pesanan.index')" :active="request()->routeIs('pesanan.index')">
                             {{ __('History Order') }}
                         </x-nav-link>
 
                     @endcan
-                    
+
                     @can('manage penjualan')
-                        <x-nav-link :href="route('users.index')" :active="request()->routeIs('users.index')">
-                            {{ __('History Penjualan') }}
-                        </x-nav-link>
+                    <x-nav-link :href="route('pesanan.index')" :active="request()->routeIs('pesanan.index')">
+                        {{ __('History Order') }}
+                    </x-nav-link>
                     @endcan
 
                     @can('manage akun')
@@ -60,7 +59,7 @@
 
                 </div>
             </div>
-            
+
             <!-- Settings Dropdown -->
             <div class="hidden sm:flex sm:items-center sm:ms-6">
                 <x-dropdown align="right" width="48">

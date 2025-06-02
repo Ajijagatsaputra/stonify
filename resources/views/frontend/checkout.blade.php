@@ -1,5 +1,13 @@
 @extends('layouts.master')
+@push('header-styles')
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css">
 
+@endpush
+
+@push('header-script')
+    <script type="text/javascript" src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="{{ env('MIDTRANS_CLIENT_KEY') }}"></script>
+
+@endpush
 @section('title', 'Checkout - Stonify')
 
 @section('content')
@@ -23,8 +31,7 @@
 
 <div class="untree_co-section">
     <div class="container">
-        <form action="{{ route('checkout.store') }}" method="POST">
-            @csrf
+        <form id="checkout-form">
             <div class="row mb-5">
                 <div class="row">
                     <div class="col-md-6 mb-5 mb-md-0">
@@ -118,6 +125,7 @@
                                                     Rp. {{ number_format($cart->sum(fn($item) => $item->product->harga * $item->quantity), 2) }}
                                                 </td>
                                             </tr>
+                                            <input type="text" name="amount" value="{{ $cart->sum(fn($item) => $item->product->harga * $item->quantity) }}" hidden id="amount">
                                         </tbody>
                                     </table>
 
@@ -136,13 +144,17 @@
                                         <label for="payment_method" class="text-black">Metode Pembayaran <span class="text-danger">*</span></label>
                                         <select name="payment_method" id="payment_method" class="form-control" required>
                                             <option value="">-- Pilih Metode Pembayaran --</option>
-                                            <option value="bank_transfer">Transfer Bank</option>
-                                            <option value="cod">Bayar di Tempat (COD)</option>
+                                            @php
+                                                $metode_pembayaran = \App\Models\MetodePembayaran::where('status', true)->get();
+                                            @endphp
+                                            @foreach ($metode_pembayaran as $item)
+                                                <option value="{{ $item->kode }}">{{ $item->nama }}</option>
+                                            @endforeach
                                         </select>
                                     </div>
 
                                     <div class="form-group mt-4">
-                                        <button type="submit" class="btn btn-black btn-lg py-3 btn-block">Place Order</button>
+                                        <button type="submit" id="submit" class="btn btn-black btn-lg py-3 btn-block">Place Order</button>
                                     </div>
 
                                 </div>
@@ -155,5 +167,69 @@
         </form>
     </div>
 </div>
+
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
+<script>
+
+    $(document).ready(function() {
+        $('#checkout-form').submit(function (e) {
+            e.preventDefault();
+
+            let formData = $(this).serialize();
+
+            $('#submit').html('Processing...').prop('disabled', true);
+
+            $.ajax({
+                url: '{{ route('payment.checkout') }}',
+                type: 'POST',
+                data: formData,
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                success: function (response) {
+                    $('#submit').html('Place Order').prop('disabled', false);
+
+                    const snapToken = response.snap_token;
+                    const orderId = response.order_id;
+
+                    // Panggil Midtrans Snap
+                    executeSnap(snapToken);
+                },
+                error: function (xhr) {
+                    $('#submit').html('Place Order').prop('disabled', false);
+
+                    if (xhr.status === 422) {
+                        let errors = xhr.responseJSON.errors;
+                        $.each(errors, function (key, value) {
+                            toastr.error(value);
+                        });
+                    } else {
+                        toastr.error("Terjadi kesalahan.");
+                    }
+                }
+            });
+        });
+
+        function executeSnap(token) {
+            snap.pay(token, {
+                onSuccess: function(result) {
+                    window.location.href = '{{ route('pesanan.index') }}';
+                },
+                onPending: function(result) {
+                    window.location.href = '{{ route('pesanan.index') }}';
+                },
+                onError: function(result) {
+                    toastr.error("Pembayaran gagal!");
+                },
+                onClose: function() {
+                    toastr.warning("Pembayaran dibatalkan.");
+                }
+            });
+        }
+    });
+</script>
+
 
 @endsection

@@ -10,7 +10,7 @@
         </div>
     </x-slot>
 
-    <div class="py-8">
+    <div class="py-12">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white shadow-lg rounded-lg overflow-hidden p-6">
             <form action="{{ route('produk.store') }}" method="POST" enctype="multipart/form-data">
@@ -47,13 +47,13 @@
 
     <!-- Tombol Simpan -->
     <div class="mt-6 flex justify-end">
-        <button type="submit" class="px-6 py-3 bg-indigo-600 text-white rounded-full font-semibold hover:bg-indigo-700 transition duration-300">
+        <button type="submit" class="px-6 py-3 bg-indigo-600 rounded-full font-semibold hover:bg-indigo-700 transition duration-300">
             Simpan
         </button>
     </div>
 </form>
 @if (session('success'))
-    <div class="bg-green-500 text-white p-4 rounded-lg mb-4 text-center">
+    <div class="bg-green-500 p-4 rounded-lg mb-4 text-center">
         {{ session('success') }}
     </div>
 @endif

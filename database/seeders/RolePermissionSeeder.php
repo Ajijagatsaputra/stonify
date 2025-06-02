@@ -46,7 +46,7 @@ class RolePermissionSeeder extends Seeder
 
         // Role: super_admin
         $superAdminRole = Role::firstOrCreate(['name' => 'super_admin']);
-        $superAdminPermissions = ['manage akun', 'manage penjualan'];
+        $superAdminPermissions = ['manage akun', 'manage penjualan', 'manage artikel', 'manage produk'];
         $superAdminRole->syncPermissions($superAdminPermissions);
 
         // Buat super admin default (jika belum ada)
@@ -58,5 +58,25 @@ class RolePermissionSeeder extends Seeder
         ]);
 
         $user->assignRole($superAdminRole);
+
+        // Buat admin default (jika belum ada)
+        $user = User::firstOrCreate([
+            'email' => 'admin@admin.com'
+        ], [
+            'name' => 'admin',
+            'password' => Hash::make('echa1234'),
+        ]);
+
+        $user->assignRole($adminRole);
+
+        // Buat user default (jika belum ada)
+        $user = User::firstOrCreate([
+            'email' => 'user@user.com'
+        ], [
+            'name' => 'user',
+            'password' => Hash::make('echa1234'),
+        ]);
+
+        $user->assignRole($userRole);
     }
 }

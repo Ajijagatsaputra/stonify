@@ -10,6 +10,9 @@ use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ArtikelController;
+use App\Http\Controllers\Midtrans\PaymentController;
+use App\Models\Artikel;
+use App\Models\carts;
 
 Route::get('/', [frontController::class, 'index'])->name('frontend.index');
 Route::get('/checkout', [frontController::class, 'checkout'])->name('frontend.checkout');
@@ -22,7 +25,20 @@ Route::get('/dashboard', function () {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::resource('users', UserController::class);
-Route::resource('artikels', ArtikelController::class);
+Route::get('/list/artikel', function () {
+    $artikels = Artikel::where('status', 'published')->latest()->get();
+    return view('frontend.artikel', compact('artikels'));
+})->name('frontend.artikel');
+
+Route::get('/list/artikel/{slug}', function ($slug) {
+    $artikel = Artikel::where('slug', $slug)->first();
+    return view('frontend.artikel-detail', compact('artikel'));
+})->name('frontend.artikel-detail');
+
+Route::middleware('auth')->group(function () {
+    Route::resource('artikels', ArtikelController::class);
+
+});
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -31,6 +47,7 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('produk', ProdukController::class);
     Route::resource('pesanan', PesananController::class);
+    Route::post('/pesanan/proses/{id}', [PesananController::class, 'proses'])->name('pesanan.proses');
 
 });
 
@@ -41,6 +58,13 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    Route::get('/cart/count', function () {
+        $count = carts::where('user_id', auth()->id())
+            ->count();
+
+        return response()->json(['count' => $count]);
+    })->name('cart.count');
+
     Route::post('/cart/add', [CartController::class, 'add'])->name('cart.add');
     Route::get('/cart', [CartController::class, 'index'])->name('frontend.cart');
     Route::post('/update-cart', [CartController::class, 'updateCart']);
@@ -52,6 +76,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
     Route::get('/orders/history', [CheckoutController::class, 'history'])->name('orders.history');
 });
+
+
+Route::post('/payment/checkout', [PaymentController::class, 'bikinTransaksi'])->name('payment.checkout');
+
 
 
 require __DIR__.'/auth.php';
