@@ -29,7 +29,7 @@
                                                 <p class="card-text text-muted small">{{ $admin->email }}</p>
                                             </div>
                                         </div>
-                                        <a href="{{ route('chat.showing', ['room' => $admin->id]) }}" 
+                                        <a href="{{ route('chat.starting', ['admin' => $admin->id]) }}"
                                            class="btn btn-primary w-100">
                                             Mulai Chat
                                         </a>
@@ -51,7 +51,7 @@
                                                 <p class="card-text text-muted">
                                                     {{ $room->messages_count ?? 0 }} pesan
                                                 </p>
-                                                <a href="{{ route('chat.showing', $room) }}" 
+                                                <a href="{{ route('chat.showing', $room) }}"
                                                    class="btn btn-outline-primary w-100">
                                                     Lanjutkan
                                                 </a>

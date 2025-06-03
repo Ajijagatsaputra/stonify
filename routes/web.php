@@ -56,6 +56,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
     Route::get('/chat/start', [ChatController::class, 'start'])->name('chat.start');
+
+    Route::get('/chat/start/{admin}', [ChatController::class, 'startChat'])->name('chat.starting');
+
     Route::post('/live-chat/{room}', [ChatController::class, 'store'])->name('chat.store');
     Route::post('/chat/room/create', [ChatController::class, 'createRoom'])->name('chat.create-room');
     Route::delete('/chat/message/{message}', [ChatController::class, 'deleteMessage'])->name('chat.delete-message');
@@ -78,6 +81,7 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout');
     Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+    Route::post('/checkout/cod', [CODCOntroller::class, 'bikinTransaksi'])->name('checkout.cod');
     Route::get('/orders/history', [CheckoutController::class, 'history'])->name('orders.history');
 });
 

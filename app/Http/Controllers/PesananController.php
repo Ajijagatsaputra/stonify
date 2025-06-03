@@ -184,40 +184,65 @@ class PesananController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        try {
-            $order = Order::with(['midtrans'])->findOrFail($id);
+        $orders = Order::findOrFail($id);
 
-            if ($order->status !== 'pending') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Hanya pesanan dengan status pending yang dapat dibatalkan'
-                ], 403);
-            }
-
-            if ($order->midtrans && $order->midtrans->snap_token) {
-                \Midtrans\Config::$serverKey = config('midtrans.server_key');
-                \Midtrans\Config::$isProduction = config('midtrans.is_production');
-
-                try {
-                    $cancel = \Midtrans\Transaction::cancel($order->midtrans->order_id);
-                } catch (\Exception $e) {
-                    Log::error('Midtrans cancellation failed: ' . $e->getMessage());
-                }
-            }
-
+        if ($orders->payment_method !== 'cod') {
+            $order = Order::findOrFail($id);
             $order->status = 'cancelled';
             $order->save();
 
+            foreach ($order->orderItems as $item) {
+                Produk::where('id', $item->product_id)
+                    ->increment('stok', $item->quantity);
+            }
+
             return response()->json([
                 'success' => true,
-                'message' => 'Pesanan berhasil dibatalkan'
+                'message' => 'Pesanan berhasil dihapus'
             ]);
+        } else {
+            try {
+                $order = Order::with(['midtrans'])->findOrFail($id);
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat membatalkan pesanan'
-            ], 500);
+                if ($order->status !== 'pending') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Hanya pesanan dengan status pending yang dapat dibatalkan'
+                    ], 403);
+                }
+
+                if ($order->midtrans && $order->midtrans->snap_token) {
+                    \Midtrans\Config::$serverKey = config('midtrans.server_key');
+                    \Midtrans\Config::$isProduction = config('midtrans.is_production');
+
+                    try {
+                        $cancel = \Midtrans\Transaction::cancel($order->midtrans->order_id);
+                    } catch (\Exception $e) {
+                        Log::error('Midtrans cancellation failed: ' . $e->getMessage());
+                    }
+                }
+
+                $order->status = 'cancelled';
+                $order->save();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Pesanan berhasil dibatalkan'
+                ]);
+
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Terjadi kesalahan saat membatalkan pesanan'
+                ], 500);
+            }
         }
+
+
+    }
+
+    public function destroyOrder($id)
+    {
+
     }
 }

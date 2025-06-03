@@ -51,6 +51,30 @@ class ChatController extends Controller
         return view('chat.start', compact('admins', 'rooms'));
     }
 
+    public function startChat($adminId)
+    {
+        $user = auth()->user();
+        // Cek apakah sudah ada room antara user dan admin
+        $room = ChatRoom::where(function($q) use ($user, $adminId) {
+            $q->where('user_id', $user->id)->where('admin_id', $adminId);
+        })->orWhere(function($q) use ($user, $adminId) {
+            $q->where('user_id', $adminId)->where('admin_id', $user->id);
+        })->first();
+
+        if (!$room) {
+            $room = ChatRoom::create([
+                'user_id' => $user->id,
+                'admin_id' => $adminId,
+                'slug' => Str::slug('Percakapan dengan ' . User::find($adminId)->name . ' - ' . $user->name),
+                'is_active' => true,
+                'name' => 'Percakapan dengan ' . User::find($adminId)->name . ' - ' . $user->name,
+            ]);
+        }
+
+        return redirect()->route('chat.showing', $room->slug);
+    }
+
+
     public function show($roomSlug)
     {
         $user = Auth::user();
@@ -95,6 +119,15 @@ class ChatController extends Controller
 
     public function store(Request $request, ChatRoom $room)
     {
+        // Log untuk debugging
+        Log::info('Chat store request received', [
+            'room_id' => $room->id,
+            'user_id' => Auth::id(),
+            'is_ajax' => $request->ajax(),
+            'content_type' => $request->header('Content-Type'),
+            'data' => $request->all()
+        ]);
+
         $request->validate([
             'message' => 'required|string|max:1000'
         ]);
@@ -128,15 +161,21 @@ class ChatController extends Controller
                 'message' => $messageData
             ]);
 
-            Log::info('Pusher event triggered', [
+            Log::info('Pusher event triggered successfully', [
                 'channel' => $channelName,
                 'event' => 'new-message',
-                'response' => $response
+                'message_id' => $message->id,
+                'pusher_response' => $response
             ]);
         } catch (\Exception $e) {
-            Log::error('Pusher error: ' . $e->getMessage());
+            Log::error('Pusher error: ' . $e->getMessage(), [
+                'channel' => $channelName,
+                'message_id' => $message->id,
+                'error' => $e->getTraceAsString()
+            ]);
         }
 
+        // Always return JSON response
         return response()->json([
             'success' => true,
             'message' => $messageData
@@ -156,7 +195,7 @@ class ChatController extends Controller
             'description' => $request->description
         ]);
 
-        return redirect()->route('chat.show', $room);
+        return redirect()->route('chat.showing', $room->slug);
     }
 
     public function deleteMessage(ChatMessage $message)

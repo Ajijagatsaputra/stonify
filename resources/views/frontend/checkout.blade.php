@@ -181,6 +181,32 @@
 
             $('#submit').html('Processing...').prop('disabled', true);
 
+            if ($('#payment_method').val() == 'bank_transfer') {
+
+                $.ajax({
+                    url: '{{ route('checkout.cod') }}',
+                    type: 'POST',
+                    data: formData,
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    success: function (response) {
+                        // Arahkan ke halaman pesanan setelah berhasil
+                        window.location.href = '{{ route('pesanan.index') }}';
+                    },
+                    error: function (xhr) {
+                        $('#submit').html('Place Order').prop('disabled', false);
+                        if (xhr.status === 422) {
+                            let errors = xhr.responseJSON.errors;
+                            $.each(errors, function (key, value) {
+                                toastr.error(value);
+                            });
+                        } else {
+                            toastr.error("Terjadi kesalahan.");
+                        }
+                    }
+                });
+            } else {
             $.ajax({
                 url: '{{ route('payment.checkout') }}',
                 type: 'POST',
@@ -208,8 +234,9 @@
                     } else {
                         toastr.error("Terjadi kesalahan.");
                     }
-                }
-            });
+                    }
+                });
+            }
         });
 
         function executeSnap(token) {

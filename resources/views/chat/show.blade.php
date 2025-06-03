@@ -23,12 +23,12 @@
                     @endforeach
                 </div>
 
-                <form id="message-form" class="d-flex gap-2" method="POST" action="#">
+                <div id="message-form" class="d-flex gap-2">
                     @csrf
                     <input type="text" id="message-input" name="message" placeholder="Ketik pesan Anda..." required
                            class="form-control" autocomplete="off" />
-                    <button type="submit" id="send-button" class="btn btn-primary">Kirim</button>
-                </form>
+                    <button type="button" id="send-button" class="btn btn-primary">Kirim</button>
+                </div>
             </div>
         </div>
     </div>
@@ -42,49 +42,60 @@
         const roomId = {{ $room->id }};
         const csrfToken = document.querySelector('input[name="_token"]').value;
 
-        // Initialize Pusher
+        // Initialize Pusher with better error handling
         console.log('Initializing Pusher...');
+        console.log('Pusher Key:', '{{ config('broadcasting.connections.pusher.key') }}');
+        console.log('Pusher Cluster:', '{{ config('broadcasting.connections.pusher.options.cluster') }}');
 
-        const pusher = new Pusher('{{ config('broadcasting.connections.pusher.key') }}', {
-            cluster: '{{ config('broadcasting.connections.pusher.options.cluster') }}',
-            encrypted: true,
-            enabledTransports: ['ws', 'wss'],
-            disabledTransports: []
-        });
+        let pusher = null;
+        let channel = null;
 
-        // Enable Pusher logging for debugging
-        Pusher.logToConsole = true;
+        try {
+            pusher = new Pusher('{{ config('broadcasting.connections.pusher.key') }}', {
+                cluster: '{{ config('broadcasting.connections.pusher.options.cluster') }}',
+                encrypted: true,
+                enabledTransports: ['ws', 'wss'],
+                disabledTransports: [],
+                authEndpoint: '/broadcasting/auth',
+                auth: {
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken
+                    }
+                }
+            });
 
-        // Subscribe to chat room channel
-        const channelName = `chat-room-${roomId}`;
-        console.log('Subscribing to channel:', channelName);
+            // Enable Pusher logging for debugging
+            Pusher.logToConsole = true;
 
-        const channel = pusher.subscribe(channelName);
+            // Subscribe to chat room channel
+            const channelName = `chat-room-${roomId}`;
+            console.log('Subscribing to channel:', channelName);
 
-        // Channel event handlers
-        channel.bind('pusher:subscription_succeeded', () => {
-            console.log('✅ Successfully subscribed to channel:', channelName);
-        });
+            channel = pusher.subscribe(channelName);
 
-        channel.bind('pusher:subscription_error', (error) => {
-            console.error('❌ Failed to subscribe to channel:', error);
-        });
+            // Channel event handlers
+            channel.bind('pusher:subscription_succeeded', () => {
+                console.log('✅ Successfully subscribed to channel:', channelName);
+            });
 
-        // Pusher connection state
-        pusher.connection.bind('connected', () => {
-            console.log('✅ Pusher connected');
-        });
+            channel.bind('pusher:subscription_error', (error) => {
+                console.error('❌ Failed to subscribe to channel:', error);
+            });
 
-        pusher.connection.bind('disconnected', () => {
-            console.log('❌ Pusher disconnected');
-        });
+            // Pusher connection state
+            pusher.connection.bind('connected', () => {
+                console.log('✅ Pusher connected');
+            });
 
-        pusher.connection.bind('error', (error) => {
-            console.error('❌ Pusher connection error:', error);
-        });
+            pusher.connection.bind('disconnected', () => {
+                console.log('❌ Pusher disconnected');
+            });
 
-        // Function to add message to chat
-        function addMessageToChat(message, isCurrentUser = false) {
+            pusher.connection.bind('error', (error) => {
+                console.error('❌ Pusher connection error:', error);
+            });
+
+            function addMessageToChat(message, isCurrentUser = false) {
             const messageHtml = `
                 <div class="mb-3 text-${message.is_admin ? 'end' : 'start'}" data-message-id="${message.id}">
                     <div class="d-inline-block p-3 rounded ${message.is_admin ? 'bg-primary text-white' : 'bg-light'} position-relative" style="max-width: 75%;">
@@ -114,41 +125,45 @@
             const chatMessages = document.getElementById('chat-messages');
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
+        
+            // Handle new messages from Pusher
+            channel.bind('new-message', function(data) {
+                console.log('📨 Received new message via Pusher:', data);
 
-        // Handle new messages from Pusher
-        channel.bind('new-message', function(data) {
-            console.log('📨 Received new message:', data);
-
-            if (!data.message) {
-                console.error('Invalid message data received');
-                return;
-            }
-
-            const message = data.message;
-
-            // Don't show the message if it's from the current user (to avoid duplication)
-            if (message.user_id === currentUserId) {
-                console.log('Message from current user, skipping display');
-                return;
-            }
-
-            addMessageToChat(message);
-
-            // Play notification sound
-            playNotificationSound();
-        });
-
-        // Handle message deletion from Pusher
-        channel.bind('message-deleted', function(data) {
-            console.log('🗑️ Message deleted:', data);
-
-            if (data.message_id) {
-                const messageDiv = document.querySelector(`[data-message-id="${data.message_id}"]`);
-                if (messageDiv) {
-                    messageDiv.remove();
+                if (!data.message) {
+                    console.error('Invalid message data received');
+                    return;
                 }
-            }
-        });
+
+                const message = data.message;
+
+                // Always show messages from other users
+                if (message.user_id !== currentUserId) {
+                    console.log('Adding message from other user:', message.user.name);
+                    addMessageToChat(message);
+                    playNotificationSound();
+                } else {
+                    console.log('Message from current user, skipping (already displayed)');
+                }
+            });
+
+            // Handle message deletion from Pusher
+            channel.bind('message-deleted', function(data) {
+                console.log('🗑️ Message deleted via Pusher:', data);
+
+                if (data.message_id) {
+                    const messageDiv = document.querySelector(`[data-message-id="${data.message_id}"]`);
+                    if (messageDiv) {
+                        messageDiv.remove();
+                        console.log('Message removed from DOM');
+                    }
+                }
+            });
+
+        } catch (error) {
+            console.error('❌ Failed to initialize Pusher:', error);
+            console.log('Chat will work without real-time updates');
+        }
 
         // Function to play notification sound
         function playNotificationSound() {
@@ -172,21 +187,18 @@
             }
         }
 
-        // Handle form submission
+        // Handle message sending
         const messageForm = document.getElementById('message-form');
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
 
-        // Prevent default form submission
-        messageForm.addEventListener('submit', async function(e) {
-            e.preventDefault(); // This is critical - prevents default form submission
-            e.stopPropagation();
-
+        // Function to send message
+        async function sendMessage() {
             const message = messageInput.value.trim();
 
             if (!message) {
                 messageInput.focus();
-                return false;
+                return;
             }
 
             // Disable form while sending
@@ -197,15 +209,17 @@
             try {
                 console.log('Sending message:', message);
 
+                const formData = new FormData();
+                formData.append('message', message);
+                formData.append('_token', csrfToken);
+
                 const response = await fetch('{{ route('chat.store', $room) }}', {
                     method: 'POST',
+                    body: formData,
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    body: JSON.stringify({ message: message })
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }
                 });
 
                 console.log('Response status:', response.status);
@@ -225,7 +239,7 @@
 
                 console.log('✅ Message sent successfully:', data);
 
-                // Add the sent message immediately to avoid waiting for Pusher
+                // Add the sent message immediately
                 addMessageToChat(data.message, true);
                 messageInput.value = '';
 
@@ -238,8 +252,13 @@
                 sendButton.textContent = 'Kirim';
                 messageInput.focus();
             }
+        }
 
-            return false; // Extra safety
+        // Button click handler
+        sendButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            sendMessage();
         });
 
         // Handle message deletion
@@ -286,20 +305,12 @@
             scrollToBottom();
         });
 
-        // Handle Enter key to send message (improved)
+        // Handle Enter key to send message
         messageInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 e.stopPropagation();
-
-                // Trigger form submit event
-                const submitEvent = new Event('submit', {
-                    bubbles: true,
-                    cancelable: true
-                });
-                messageForm.dispatchEvent(submitEvent);
-
-                return false;
+                sendMessage();
             }
         });
     </script>
