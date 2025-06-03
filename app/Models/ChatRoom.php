@@ -9,20 +9,26 @@ class ChatRoom extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['user_id', 'admin_id'];
+    protected $fillable = [
+        'user_id',
+        'admin_id',
+        'name',
+        'slug',
+        'description',
+        'is_active'
+    ];
 
-    public function chats()
+    protected $casts = [
+        'is_active' => 'boolean'
+    ];
+
+    public function messages()
     {
-        return $this->hasMany(Chat::class);
+        return $this->hasMany(ChatMessage::class);
     }
 
-    public function user()
+    public function getRouteKeyName()
     {
-        return $this->belongsTo(User::class, 'user_id');
-    }
-
-    public function admin()
-    {
-        return $this->belongsTo(User::class, 'admin_id');
+        return 'slug';
     }
 }

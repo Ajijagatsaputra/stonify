@@ -52,9 +52,13 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('/live-chat/{room}', [ChatController::class, 'show'])->name('chat.showing');
+
     Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
-    Route::post('/chat/send', [ChatController::class, 'sendMessage'])->name('chat.send');
-    Route::get('/chat/{roomId}', [ChatController::class, 'show'])->name('chat.show');
+    Route::get('/chat/start', [ChatController::class, 'start'])->name('chat.start');
+    Route::post('/live-chat/{room}', [ChatController::class, 'store'])->name('chat.store');
+    Route::post('/chat/room/create', [ChatController::class, 'createRoom'])->name('chat.create-room');
+    Route::delete('/chat/message/{message}', [ChatController::class, 'deleteMessage'])->name('chat.delete-message');
 });
 
 Route::middleware('auth')->group(function () {
