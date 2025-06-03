@@ -10,7 +10,7 @@
         </div>
     </x-slot>
 
-    <div class="py-8">
+    <div class="py-12">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
             <!-- Notifikasi -->
             @if (session('success'))
@@ -81,7 +81,7 @@
 
                     <!-- Tombol Update -->
                     <div class="mt-6 flex justify-end">
-                        <button type="submit" class="px-6 py-3 bg-indigo-600 text-white rounded-full font-semibold hover:bg-indigo-700 transition duration-300">
+                        <button type="submit" class="px-6 py-3 bg-indigo-600 rounded-full font-semibold hover:bg-indigo-700 transition duration-300">
                             Update
                         </button>
                     </div>

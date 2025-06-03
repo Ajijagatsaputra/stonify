@@ -101,6 +101,8 @@
                 if (response.cart) {
                     updateCartUI(response.cart);
                     updateCartTotal(response.total);
+
+                    updateCartCount();
                 }
             }
         });

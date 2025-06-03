@@ -12,21 +12,15 @@ return new class extends Migration
     public function up()
 {
     Schema::create('orders', function (Blueprint $table) {
-        $table->id();
-        $table->foreignId('user_id')->constrained()->onDelete('cascade');
-        $table->string('nama_depan');
-        $table->string('nama_belakang');
-        $table->string('alamat');
-        $table->string('state_country');
-        $table->string('postal_zip');
-        $table->string('email');
-        $table->string('phone');
-        $table->text('notes')->nullable();
-        $table->string('payment_method');
-        $table->integer('total');
-        $table->string('va_number')->nullable();
-        $table->enum('status', ['pending', 'confirmed', 'shipped'])->default('pending');
+        $table->bigIncrements('id');
+        $table->bigInteger('user_id')->unsigned()->index();
+        $table->decimal('total', 15, 2);
+        $table->enum('status', ['pending', 'paid', 'failed', 'cancelled', 'shipping', 'success'])->default('pending');
+        $table->string('payment_method')->nullable();
+        $table->text('order_notes')->nullable();
         $table->timestamps();
+
+        $table->foreign('user_id')->references('id')->on('users');
     });
 }
 
@@ -36,6 +30,8 @@ return new class extends Migration
      */
     public function down(): void
     {
+
         Schema::dropIfExists('orders');
+
     }
 };

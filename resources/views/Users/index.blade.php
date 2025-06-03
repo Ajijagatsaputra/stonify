@@ -1,46 +1,55 @@
 <x-app-layout>
+    @push('script-header')
+    {{-- Datatables --}}
+   <link rel="stylesheet" href="https://cdn.datatables.net/2.1.8/css/dataTables.dataTables.min.css">
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/2.1.8/js/dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/3.0.3/js/responsive.dataTables.js"></script>
+    <script src="https://cdn.datatables.net/scroller/2.4.3/js/dataTables.scroller.min.js"></script>
+       
+   @endpush
+   
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                 {{ __('Kelola Admin') }}
             </h2>
-            <a href="{{ route('users.create') }}" class="mt-4 sm:mt-0 px-6 py-3 bg-indigo-600 text-white rounded-full font-semibold hover:bg-indigo-700 transition duration-300 text-center">
-                Tambah Admin
-            </a>
+           
         </div>
     </x-slot>
 
-    <div class="py-8">
+    <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white shadow-lg rounded-lg overflow-hidden">
-                <div class="overflow-x-auto">
-                    @foreach ($users as $user)
-                    <div class="rounded-lg p-4 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between">
-                        <div class="flex-1 flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-6">
-                            <div class="flex-1">
-                                <p class="text-sm font-medium text-gray-700">Nama</p>
-                                <p class="mt-1 text-lg font-semibold text-gray-900">{{ $user->name }}</p>
-                            </div>
-                            <div class="flex-1">
-                                <p class="text-sm font-medium text-gray-700">Email</p>
-                                <p class="mt-1 text-lg font-semibold text-gray-900">{{ $user->email }}</p>
-                            </div>
-                        </div>
+            <div class="bg-white shadow-sm sm:rounded-lg">
+                <div class="p-6 text-gray-900">
 
-                        <div class="mt-4 sm:mt-0 flex space-x-2">
-                            <a href="{{ route('users.edit', $user->id) }}" class="px-4 py-2 bg-indigo-600 text-white rounded-full font-semibold hover:bg-indigo-700 transition duration-300">
-                                Edit
-                            </a>
-                            <form action="{{ route('users.destroy', $user->id) }}" method="POST" class="delete-form">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-full font-semibold hover:bg-red-700 transition duration-300">
-                                    Hapus
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                    @endforeach
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h3 class="card-title mb-0">Daftar Akun Admin</h3>
+                                
+                                <a href="{{ route('users.create') }}" class="px-6 py-3 bg-indigo-600 rounded-full font-semibold hover:bg-indigo-700 transition duration-300 text-center">
+                                  Tambah Admin
+                                </a>
+                              </div>
+                            </div>
+                            <!-- /.card-header -->
+                            <div class="card-body">
+                              <table class="table" id="datatable">
+                                  <thead>
+                                      <tr>
+                                        <th>#</th>
+                                        <th>Nama</th>
+                                        <th>Email</th>
+                                        <th>Dibuat Pada</th>
+                                        <th>Diperbarui Pada</th>
+                                        <th>Aksi</th>
+                                      </tr>
+                                  </thead>
+                              </table>
+                            </div>
+                            <!-- /.card-body -->
+                          </div>
                 </div>
             </div>
         </div>
@@ -48,26 +57,78 @@
 
     <!-- SweetAlert2 Script -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+
+    <script type="text/javascript">
+        $.ajaxSetup({
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            }
+        });
+
+        $(document).ready(function() {
+            $('#datatable').DataTable({
+                "processing": true,
+                "serverSide": true,
+                "ajax": {
+                    "url": "{{ route('users.index') }}",
+                    "type": "GET"
+                },
+                "columns": [
+                    {
+                        data: 'id',
+                        name: 'id',
+                        render: function (data, type, row, meta) {
+                            return meta.row + 1;
+                        }
+                    },
+                    { data: 'name', name: 'name' },
+                    { data: 'email', name: 'email' },
+                    { data: 'created_at', name: 'created_at' },
+                    { data: 'updated_at', name: 'updated_at' },
+                    { data: 'action', name: 'action' }
+                ],
+                "order": [[ 0, "desc" ]],
+
+            });
+        });
+    </script>
+
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            document.querySelectorAll('.delete-form').forEach(form => {
-                form.addEventListener('submit', function (e) {
-                    e.preventDefault();
-                    Swal.fire({
-                        title: 'Apakah Anda yakin?',
-                        text: "Data ini akan dihapus dan tidak dapat dikembalikan!",
-                        icon: 'warning',
-                        showCancelButton: true,
-                        confirmButtonColor: '#3085d6',
-                        cancelButtonColor: '#d33',
-                        confirmButtonText: 'Ya, hapus!',
-                        cancelButtonText: 'Batal'
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            form.submit();
+        $('body').on('click', '.edit', function () {
+            var id = $(this).data('id');
+            var url = "{{ route('users.edit', ['user' => ':id']) }}".replace(':id', id);
+            window.location.href = url;
+        });
+        $('body').on('click', '.delete', function () {
+            var id = $(this).data('id');
+            var url = "{{ route('users.destroy', ['user' => ':id']) }}".replace(':id', id);
+            Swal.fire({
+                title: 'Anda yakin?',
+                text: "Apakah Anda yakin ingin menghapus data ini?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Ya, hapus!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        type: "POST",
+                        url: url,
+                        data: {
+                            _method: 'DELETE'
+                        },
+                        success: function (data) {
+                            $('#datatable').DataTable().ajax.reload();
+                            toastr.success('Data berhasil dihapus!');
+                        },
+                        error: function (data) {
+                            console.log('Error:', data);
+                            toastr.error('Terjadi kesalahan saat menghapus data.');
                         }
                     });
-                });
+                }
             });
         });
     </script>

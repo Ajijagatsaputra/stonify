@@ -6,13 +6,35 @@ use App\Models\Produk;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Controller;
+use Yajra\DataTables\Facades\DataTables;
 
 class ProdukController extends Controller
 {
     public function index()
     {
-        $produk = Produk::all(); // Fetch all products
-        return view('produk.index', compact('produk'));
+        if (request()->ajax()) {
+            $produk = Produk::get();
+            return DataTables::of($produk)
+                ->editColumn('foto_produk', function ($produk) {
+                    return '<img src="' . asset('storage/' . $produk->foto_produk) . '" width="100" height="100">';
+                })
+                ->addColumn('action', function ($produk) {
+                    return '<div class="btn-group" role="group" aria-label="Basic example">
+                                    <a href="javascript:void(0)" data-toggle="tooltip" data-id="'.$produk->id.'" data-original-title="Edit" class="edit btn btn-primary btn-xs">Edit</a>
+                                    &nbsp;
+                                    <a href="javascript:void(0)" data-toggle="tooltip" data-id="'.$produk->id.'" data-original-title="Delete" class="delete btn btn-danger btn-xs">Delete</a>
+                                </div>';
+                })
+                ->editColumn('created_at', function ($produk) {
+                    return $produk->created_at->diffForHumans();
+                })
+                ->editColumn('updated_at', function ($produk) {
+                    return $produk->updated_at ? $produk->updated_at->diffForHumans() : '-';
+                })
+                ->rawColumns(['foto_produk','action'])
+                ->make(true);
+        }
+        return view('produk.index');
     }
 
     public function create()
@@ -75,8 +97,8 @@ public function show($id)
     // Handle upload foto
     if ($request->hasFile('foto_produk')) {
         // Hapus foto lama jika ada
-        if ($produk->foto_produk && \Storage::exists($produk->foto_produk)) {
-            \Storage::delete($produk->foto_produk);
+        if ($produk->foto_produk && Storage::exists($produk->foto_produk)) {
+            Storage::delete($produk->foto_produk);
         }
 
         $produk->foto_produk = $request->file('foto_produk')->store('produk', 'public');
@@ -93,13 +115,15 @@ public function show($id)
         $produk = Produk::findOrFail($id);
 
         // Delete image if it exists
-        if ($produk->image) {
-            Storage::disk('public')->delete($produk->image);
+        if ($produk->foto_produk && Storage::exists($produk->foto_produk)) {
+            Storage::delete($produk->foto_produk);
         }
 
-        $produk->delete();
-
-        return redirect()->route('produk.index')->with('success', 'Produk berhasil dihapus!');
+        if ($produk->delete()) {
+            return response()->json(['success' => 'Produk berhasil dihapus!']);
+        } else {
+            return response()->json(['error' => 'Gagal menghapus produk.'], 400);
+        }
     }
     
 }

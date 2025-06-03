@@ -11,7 +11,7 @@ class HistoryOrderController extends Controller
 {
     public function index()
     {
-        $order = Order::with('order')->get();
+        $order = Order::with('items')->get();
         return view('order.index', compact('order'));
     }
 }

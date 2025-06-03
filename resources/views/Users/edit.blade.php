@@ -6,7 +6,7 @@
         </h2>
     </x-slot>
 
-    <div class="py-8">
+    <div class="py-12">
         <div class="max-w-xl mx-auto bg-white p-6 rounded-lg shadow">
             <form action="{{ route('users.update', $user->id) }}" method="POST">
                 @csrf
@@ -35,7 +35,7 @@
                     @error('password') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                 </div>
 
-                <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition">
+                <button type="submit" class="w-full bg-indigo-600 py-2 rounded-lg font-semibold hover:bg-indigo-700 transition">
                     Update
                 </button>
             </form>

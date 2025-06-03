@@ -6,13 +6,34 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
+use Yajra\DataTables\Facades\DataTables;
 
 class UserController extends Controller
 {
     public function index()
     {
-        $users = User::role('admin')->get(); // hanya tampilkan admin
-        return view('Users.index', compact('users'));
+
+        if (request()->ajax()) {
+            $users = User::where('role_id', 2)->get();
+            return DataTables::of($users)
+                ->addColumn('action', function ($users) {
+                    return '<div class="btn-group" role="group" aria-label="Basic example">
+                                    <a href="javascript:void(0)" data-toggle="tooltip" data-id="'.$users->id.'" data-original-title="Edit" class="edit btn btn-primary btn-xs">Edit</a>
+                                    &nbsp;
+                                    <a href="javascript:void(0)" data-toggle="tooltip" data-id="'.$users->id.'" data-original-title="Delete" class="delete btn btn-danger btn-xs">Delete</a>
+                                </div>';
+                })
+                ->editColumn('created_at', function ($users) {
+                    return $users->created_at->diffForHumans();
+                })
+                ->editColumn('updated_at', function ($users) {
+                    return $users->updated_at ? $users->updated_at->diffForHumans() : '-';
+                })
+                ->rawColumns(['action'])
+                ->make(true);
+        }
+
+        return view('Users.index');
     }
 
     public function create()
@@ -26,12 +47,14 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
+
         ]);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'role_id' => 2,
         ]);
 
         $user->assignRole('admin'); // langsung assign role admin
@@ -54,7 +77,7 @@ class UserController extends Controller
         ]);
 
         $user = User::findOrFail($id);
-        $user->name = $request->name; // ✅ Tambahkan ini
+        $user->name = $request->name;
         $user->email = $request->email;
 
         if ($request->filled('password')) {
@@ -71,6 +94,20 @@ class UserController extends Controller
         $user = User::findOrFail($id);
         $user->delete();
 
-        return redirect()->route('users.index')->with('success', 'Admin deleted successfully.');
+        return response()->json(['success' => 'Admin deleted successfully.']);
+    }
+
+    public function getUser(){
+
+        if(request()->ajax()){
+            $users = User::where('role_id', 2)->get();
+            return DataTables::of($users)
+                ->addColumn('action', function ($users) {
+                    return '<a href="javascript:void(0)" data-toggle="tooltip" data-id="'.$users->id.'" data-original-title="Edit" class="edit btn btn-primary btn-xs">Edit</a>';
+                })
+                ->make(true);
+        }
+
+        return view('Users.index');
     }
 }

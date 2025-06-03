@@ -2,136 +2,221 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Chat;
 use App\Models\ChatRoom;
+use App\Models\ChatMessage;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Pusher\Pusher;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class ChatController extends Controller
 {
+    protected $pusher;
+
+    public function __construct()
+    {
+        $this->pusher = new Pusher(
+            config('broadcasting.connections.pusher.key'),
+            config('broadcasting.connections.pusher.secret'),
+            config('broadcasting.connections.pusher.app_id'),
+            [
+                'cluster' => config('broadcasting.connections.pusher.options.cluster'),
+                'useTLS' => true
+            ]
+        );
+    }
+
     public function index()
     {
-        $userId = Auth::id();
-        $superAdmin = User::whereHas('roles', function ($query) {
-            $query->where('name', 'super_admin');
-        })->first();
-
-        if (!$superAdmin) {
-            return abort(403, 'Super admin tidak ditemukan.');
+        if (auth()->user()->hasRole('admin')) {
+            $rooms = ChatRoom::where('is_active', true)->get();
+            return view('chat.index', compact('rooms'));
+        } else {
+            return $this->start();
         }
-
-        $chatRooms = ChatRoom::where('user_id', $userId)
-                            ->orWhere('admin_id', $userId)
-                            ->with('user', 'admin')
-                            ->get();
-
-        $chatRoom = $chatRooms->first();
-
-        $chats = $chatRoom ? Chat::where('chat_room_id', $chatRoom->id)
-                            ->orderBy('created_at', 'asc')
-                            ->get() : [];
-
-        return view('chat.index', compact('chats', 'superAdmin', 'chatRoom', 'chatRooms'));
     }
 
-    public function sendMessage(Request $request)
+    public function start()
     {
-        $request->validate([
-            'message' => 'required',
-            'receiver_id' => 'required|exists:users,id'
-        ]);
-    
-        $sender = Auth::user();
-        $receiver = User::findOrFail($request->receiver_id);
-    
-        // Cari atau buat chat room antara sender dan receiver
-        $chatRoom = ChatRoom::where(function ($query) use ($sender, $receiver) {
-            $query->where('user_id', $sender->id)
-                  ->where('admin_id', $receiver->id);
-        })->orWhere(function ($query) use ($sender, $receiver) {
-            $query->where('user_id', $receiver->id)
-                  ->where('admin_id', $sender->id);
+        $admins = User::whereHas('roles', function ($query) {
+            $query->where('name', 'admin');
+        })->get();
+        $rooms = ChatRoom::where('user_id', auth()->id())
+                        ->where('is_active', true)
+                        ->withCount('messages')
+                        ->get();
+
+        return view('chat.start', compact('admins', 'rooms'));
+    }
+
+    public function startChat($adminId)
+    {
+        $user = auth()->user();
+        // Cek apakah sudah ada room antara user dan admin
+        $room = ChatRoom::where(function($q) use ($user, $adminId) {
+            $q->where('user_id', $user->id)->where('admin_id', $adminId);
+        })->orWhere(function($q) use ($user, $adminId) {
+            $q->where('user_id', $adminId)->where('admin_id', $user->id);
         })->first();
-    
-        if (!$chatRoom) {
-            $chatRoom = ChatRoom::create([
-                'user_id' => min($sender->id, $receiver->id),
-                'admin_id' => max($sender->id, $receiver->id)
+
+        if (!$room) {
+            $room = ChatRoom::create([
+                'user_id' => $user->id,
+                'admin_id' => $adminId,
+                'slug' => Str::slug('Percakapan dengan ' . User::find($adminId)->name . ' - ' . $user->name),
+                'is_active' => true,
+                'name' => 'Percakapan dengan ' . User::find($adminId)->name . ' - ' . $user->name,
             ]);
         }
-    
-        // Simpan pesan ke chat room yang sesuai
-        $chat = Chat::create([
-            'sender_id' => $sender->id,
-            'receiver_id' => $receiver->id,
+
+        return redirect()->route('chat.showing', $room->slug);
+    }
+
+
+    public function show($roomSlug)
+    {
+        $user = Auth::user();
+
+        // Try to find room by slug
+        $room = ChatRoom::where('slug', $roomSlug)->first();
+
+        if (!$room) {
+            // If not found by slug, and user is not admin, treat slug as admin ID to create/find room
+            if (!$user->hasRole('admin') && preg_match('/^chat-(\d+)-(\d+)$/', $roomSlug, $matches)) {
+                $adminId = $matches[2];
+                $existingRoom = ChatRoom::where('user_id', $user->id)
+                    ->where('admin_id', $adminId)
+                    ->where('is_active', true)
+                    ->first();
+
+                if (!$existingRoom) {
+                    $admin = User::findOrFail($adminId);
+                    $existingRoom = ChatRoom::create([
+                        'user_id' => $user->id,
+                        'admin_id' => $admin->id,
+                        'name' => 'Chat dengan ' . $admin->name,
+                        'slug' => $roomSlug,
+                        'is_active' => true
+                    ]);
+                }
+
+                $room = $existingRoom;
+            } else {
+                abort(404, 'Chat room not found');
+            }
+        }
+
+        // Authorization check
+        if ($room->user_id !== $user->id && !$user->hasRole('admin')) {
+            abort(403, 'Unauthorized');
+        }
+
+        $messages = $room->messages()->with('user')->latest()->take(50)->get()->reverse();
+        return view('chat.show', compact('room', 'messages'));
+    }
+
+    public function store(Request $request, ChatRoom $room)
+    {
+        // Log untuk debugging
+        Log::info('Chat store request received', [
+            'room_id' => $room->id,
+            'user_id' => Auth::id(),
+            'is_ajax' => $request->ajax(),
+            'content_type' => $request->header('Content-Type'),
+            'data' => $request->all()
+        ]);
+
+        $request->validate([
+            'message' => 'required|string|max:1000'
+        ]);
+
+        $message = $room->messages()->create([
+            'user_id' => Auth::id(),
             'message' => $request->message,
-            'chat_room_id' => $chatRoom->id
+            'is_admin' => Auth::user()->hasRole('admin')
         ]);
-    
-        // Kirim pesan secara real-time dengan Pusher
-        $pusher = new Pusher(
-            env('PUSHER_APP_KEY'),
-            env('PUSHER_APP_SECRET'),
-            env('PUSHER_APP_ID'),
-            ['cluster' => env('PUSHER_APP_CLUSTER')]
-        );
-    
-        $pusher->trigger("chat-channel-{$chatRoom->id}", 'new-message', [
-            'sender' => $sender->name,
-            'message' => $chat->message
+
+        $message->load('user');
+
+        // Prepare message data
+        $messageData = [
+            'id' => $message->id,
+            'message' => $message->message,
+            'user_id' => $message->user_id,
+            'is_admin' => $message->is_admin,
+            'created_at' => $message->created_at->diffForHumans(),
+            'user' => [
+                'id' => $message->user->id,
+                'name' => $message->user->name
+            ]
+        ];
+
+        // Trigger Pusher event
+        $channelName = 'chat-room-' . $room->id;
+
+        try {
+            $response = $this->pusher->trigger($channelName, 'new-message', [
+                'message' => $messageData
+            ]);
+
+            Log::info('Pusher event triggered successfully', [
+                'channel' => $channelName,
+                'event' => 'new-message',
+                'message_id' => $message->id,
+                'pusher_response' => $response
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Pusher error: ' . $e->getMessage(), [
+                'channel' => $channelName,
+                'message_id' => $message->id,
+                'error' => $e->getTraceAsString()
+            ]);
+        }
+
+        // Always return JSON response
+        return response()->json([
+            'success' => true,
+            'message' => $messageData
         ]);
-    
-        return response()->json($chat);
     }
-    
 
-
-
-    public function deleteMessage($id)
+    public function createRoom(Request $request)
     {
-        $chat = Chat::findOrFail($id);
-        if ($chat->sender_id !== Auth::id()) {
-            return response()->json(['error' => 'Tidak diizinkan'], 403);
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:1000'
+        ]);
+
+        $room = ChatRoom::create([
+            'name' => $request->name,
+            'slug' => Str::slug($request->name),
+            'description' => $request->description
+        ]);
+
+        return redirect()->route('chat.showing', $room->slug);
+    }
+
+    public function deleteMessage(ChatMessage $message)
+    {
+        if (auth()->user()->hasRole('admin') || auth()->id() === $message->user_id) {
+            $roomId = $message->room_id;
+            $messageId = $message->id;
+
+            $message->delete();
+
+            // Trigger Pusher event for message deletion
+            try {
+                $this->pusher->trigger('chat-room-' . $roomId, 'message-deleted', [
+                    'message_id' => $messageId
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Pusher delete error: ' . $e->getMessage());
+            }
+
+            return response()->json(['success' => true]);
         }
-
-        $chat->delete();
-        return response()->json(['success' => 'Pesan berhasil dihapus']);
+        return response()->json(['error' => 'Unauthorized'], 403);
     }
-
-    public function updateMessage(Request $request, $id)
-    {
-        $request->validate(['message' => 'required']);
-
-        $chat = Chat::findOrFail($id);
-        if ($chat->sender_id !== Auth::id()) {
-            return response()->json(['error' => 'Tidak diizinkan'], 403);
-        }
-
-        $chat->update(['message' => $request->message]);
-
-        return response()->json(['success' => 'Pesan berhasil diperbarui']);
-    }
-
-    public function closeChat($id)
-    {
-        $chatRoom = ChatRoom::findOrFail($id);
-        $chatRoom->delete();
-
-        return response()->json(['success' => 'Chat berhasil ditutup']);
-    }
-    public function show($roomId)
-    {
-        $chatRoom = ChatRoom::find($roomId);
-
-        if (!$chatRoom) {
-            return response()->json(['message' => 'Chat room not found'], 404);
-        }
-
-        $chats = $chatRoom->chats()->orderBy('created_at', 'asc')->get();
-
-        return view('chat.partials.chat_messages', compact('chats'))->render();
-    }
-
 }

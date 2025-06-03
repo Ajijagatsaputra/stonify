@@ -1,5 +1,9 @@
 @extends('layouts.master')
 
+@push('header-styles')
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css">
+    
+@endpush
 @section('title', 'Home - Stonify')
 
 @section('content')
@@ -38,6 +42,10 @@
     </div>
 </div>
 
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
+
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         document.querySelectorAll('.add-to-cart').forEach(button => {
@@ -68,9 +76,12 @@
                     }
 
                     let data = await response.json();
-                    alert(data.message);
+                    toastr.success(data.message);
+                    updateCartCount();
                 } catch (error) {
-                    console.error("Error:", error);
+                    toastr.error("Terjadi kesalahan saat menambahkan produk ke keranjang.");
+                    toastr.error("Login/Daftar terlebih dahulu untuk menambahkan produk ke keranjang.");
+
                 }
             });
         });
