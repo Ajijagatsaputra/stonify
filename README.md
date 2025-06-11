@@ -77,6 +77,15 @@ DB_PORT=3306
 DB_DATABASE=stonify_backend
 DB_USERNAME=root
 DB_PASSWORD=
+
+MAIL_MAILER=smtp
+MAIL_HOST=mail.withmangg.my.id
+MAIL_PORT=
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_ENCRYPTION=null
+MAIL_FROM_ADDRESS=
+MAIL_FROM_NAME="${APP_NAME}"
 ```
 
 7. Run database migrations and seeders
