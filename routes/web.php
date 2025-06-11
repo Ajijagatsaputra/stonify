@@ -25,6 +25,7 @@ Route::get('/dashboard', function () {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::resource('users', UserController::class);
+
 Route::get('/list/artikel', function () {
     $artikels = Artikel::where('status', 'published')->latest()->get();
     return view('frontend.artikel', compact('artikels'));
